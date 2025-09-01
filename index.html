@@ -32,7 +32,7 @@
   <div class="app">
     <header>
       <div class="row" style="justify-content:space-between">
-        <div class="title">🛡️ OpenRouter Inline Chat — Proxy Mode (no keys in browser)</div>
+        <div class="title">🛡️ OpenRouter Inline Chat — Proxy Mode (using chatbotkey)</div>
         <div id="status" class="pill">idle</div>
       </div>
       <div class="row">
@@ -43,7 +43,7 @@
         <div style="flex:1 1 300px">
           <label>Model slug</label>
           <input id="model" type="text" placeholder="e.g., meta-llama/llama-3.3-70b-instruct" />
-          <div class="hint">Uses your serverless proxy. Set env var <code>CHATBOTKEY</code> (or <code>OPENROUTER_API_KEY</code>) on the server.</div>
+          <div class="hint">Uses your serverless proxy. Set env var <code>chatbotkey</code> on the server.</div>
         </div>
       </div>
       <div class="hint">Note: No provider is truly “uncensored.” OpenRouter routes to hosts with their own AUPs. Illegal/harmful content is blocked.</div>
@@ -69,14 +69,10 @@
       messages: JSON.parse(localStorage.getItem('or_messages')||'[]')
     };
 
-    // UI init
     $('#model').value = state.model;
     $('#stream').checked = state.stream;
-
-    // Render history
     state.messages.forEach(m=>renderBubble(m.role,m.content));
 
-    // Compose
     document.querySelector('#composer').addEventListener('submit', async (e)=>{
       e.preventDefault();
       const text = $('#user').value.trim();
@@ -106,7 +102,6 @@
     function status(s){ statusPill.textContent=s; chat.setAttribute('aria-busy', s!=='idle'); }
     function toast(t){ statusPill.textContent=t; setTimeout(()=>status('idle'), 1200); }
 
-    // Update settings
     $('#model').addEventListener('change', ()=>{ state.model = $('#model').value.trim() || state.model; persist(); });
     $('#stream').addEventListener('change', ()=>{ state.stream = $('#stream').checked; persist(); });
 
@@ -148,8 +143,7 @@
           const {value,done} = await reader.read();
           if(done) break;
           const chunk = decoder.decode(value, {stream:true});
-          for(const line of chunk.split('
-')){
+          for(const line of chunk.split('\n')){
             if(!line.startsWith('data:')) continue;
             const data = line.slice(5).trim();
             if(data === '[DONE]') break;
@@ -157,7 +151,7 @@
               const json = JSON.parse(data);
               const delta = json.choices?.[0]?.delta?.content ?? '';
               if(delta){ buf += delta; bubble.textContent = buf; chat.scrollTop = chat.scrollHeight; }
-            }catch{ /* non-JSON heartbeat */ }
+            }catch{}
           }
         }
         state.messages.push({ role:'assistant', content: buf || '[No content]' });
