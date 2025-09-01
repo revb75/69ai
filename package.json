@@ -2,16 +2,11 @@
   "name": "chat-relay",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "node server.js"
+    "dev": "vercel dev"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
     "pubnub": "^7.6.1"
   }
 }
