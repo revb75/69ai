@@ -54,26 +54,56 @@ const els={ gate:document.getElementById("gate"), chat:document.getElementById("
   dob:document.getElementById("dob"), gateMsg:document.getElementById("gateMsg"),
   messages:document.getElementById("messages"), composer:document.getElementById("composer"),
   input:document.getElementById("messageInput"), presence:document.getElementById("presenceCount") };
-function addMessage({author,text,ts,mine}){ const d=document.createElement("div");
-  d.className="msg"+(mine?" me":""); d.innerHTML=`<div class="bubble"><b>${author}</b>: ${text}</div>`;
-  els.messages.appendChild(d); els.messages.scrollTop=els.messages.scrollHeight;}
-els.enterBtn.onclick=async()=>{ me=els.name.value.trim(); const dob=els.dob.value;
+
+function addMessage({author,text,ts,mine}) {
+  const d=document.createElement("div");
+  d.className="msg"+(mine?" me":"");
+  d.innerHTML=`<div class="bubble"><b>${author}</b>: ${text}</div>`;
+  els.messages.appendChild(d);
+  els.messages.scrollTop=els.messages.scrollHeight;
+}
+
+els.enterBtn.onclick=async()=>{
+  me=els.name.value.trim();
+  const dob=els.dob.value;
   if(!me||!dob){ els.gateMsg.textContent="Enter name and DOB"; return;}
-  try{ const r=await fetch("/auth",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({user:me,dob})}); const data=await r.json();
+  try{
+    const r=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user:me,dob})});
+    const data=await r.json();
     if(!r.ok){ els.gateMsg.textContent=data.error||"Auth failed"; return;}
-    token=data.token; setupChat(data.subscribeKey,data.defaultChannel);
-    els.gate.classList.remove("active"); els.chat.classList.add("active");}
-  catch{ els.gateMsg.textContent="Server not reachable"; }};
-function setupChat(subscribeKey,channel){ currentChannel=channel;
-  pubnub=new PubNub({subscribeKey,uuid:me}); pubnub.addListener({ message:evt=>{
-    const {from,text}=evt.message; addMessage({author:from,text,ts:evt.timetoken/10000,mine:from===me}); },
-    presence:()=>refreshHereNow()}); pubnub.subscribe({channels:[channel],withPresence:true});
-  refreshHereNow(); els.composer.onsubmit=async e=>{ e.preventDefault(); const text=els.input.value.trim();
-    if(!text) return; els.input.value=""; await fetch("/send",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({channel,from:me,text,token})}).catch(()=>addMessage({author:"System",text:"Failed to reach API",ts:Date.now(),mine:false}));};}
-async function refreshHereNow(){ if(!currentChannel) return; try{ const r=await pubnub.hereNow({channels:[currentChannel],includeUUIDs:true});
-  els.presence.textContent=`${r.totalOccupancy||0} online`; }catch{}}
+    token=data.token;
+    setupChat(data.subscribeKey,data.defaultChannel);
+    els.gate.classList.remove("active");
+    els.chat.classList.add("active");
+  }catch{ els.gateMsg.textContent="Server not reachable"; }
+};
+
+function setupChat(subscribeKey,channel){
+  currentChannel=channel;
+  pubnub=new PubNub({subscribeKey,uuid:me});
+  pubnub.addListener({ message:evt=>{
+    const {from,text}=evt.message;
+    addMessage({author:from,text,ts:evt.timetoken/10000,mine:from===me});},
+    presence:()=>refreshHereNow()});
+  pubnub.subscribe({channels:[channel],withPresence:true});
+  refreshHereNow();
+  els.composer.onsubmit=async e=>{
+    e.preventDefault();
+    const text=els.input.value.trim();
+    if(!text) return;
+    els.input.value="";
+    await fetch("/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({channel,from:me,text,token})})
+      .catch(()=>addMessage({author:"System",text:"Failed to reach API",ts:Date.now(),mine:false}));
+  };
+}
+
+async function refreshHereNow(){
+  if(!currentChannel) return;
+  try{
+    const r=await pubnub.hereNow({channels:[currentChannel],includeUUIDs:true});
+    els.presence.textContent=`${r.totalOccupancy||0} online`;
+  }catch{}
+}
 </script>
 </body>
 </html>
