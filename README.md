@@ -1,14 +1,14 @@
-# Chat Relay MVP
+# Chat Relay MVP (Final)
 
-Turnkey starter chat project.
+This project is ready-to-run with your PubNub keys.
 
-## Run it
+## Run it locally
 
 ```bash
 npm install
-cp .env.example .env
-# edit .env with your PubNub keys
 npm run dev
 ```
 
-Open http://localhost:5173
+Then open http://localhost:5173
+
+Your PubNub keys are already included in `.env`.

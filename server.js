@@ -11,6 +11,7 @@ dotenv.config();
 const {
   PUBNUB_PUBLISH_KEY,
   PUBNUB_SUBSCRIBE_KEY,
+  PUBNUB_SECRET_KEY,
   JWT_SECRET,
   DEFAULT_CHANNEL = "room-1",
   PORT = 5173,
@@ -19,6 +20,7 @@ const {
 const pubnub = new PubNub({
   publishKey: PUBNUB_PUBLISH_KEY,
   subscribeKey: PUBNUB_SUBSCRIBE_KEY,
+  secretKey: PUBNUB_SECRET_KEY,
   uuid: "server",
 });
 
