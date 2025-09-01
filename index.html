@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Hocus Chatbot</title>
+  <title>Uncensored Chatbot (Debug)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -42,37 +42,63 @@
       display: flex;
       padding: 10px;
       background: #1e1e1e;
+      gap: 8px;
     }
-    #inputArea input {
+    #userInput {
       flex: 1;
-      padding: 8px;
+      padding: 10px;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       background: #2a2a2a;
       color: #fff;
+      outline: none;
     }
-    #inputArea button {
-      margin-left: 10px;
-      padding: 8px 12px;
+    button {
+      padding: 10px 14px;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       background: #007bff;
       color: white;
       cursor: pointer;
+    }
+    .small {
+      font-size: 12px;
+      opacity: 0.8;
+      padding: 6px 10px;
     }
   </style>
 </head>
 <body>
   <div id="chatbox"></div>
-  <div id="inputArea">
+
+  <!-- Using a <form> safely: we preventDefault so it never reloads or posts to /api/ai -->
+  <form id="inputArea">
     <input type="text" id="userInput" placeholder="Type your message...">
-    <button onclick="sendMessage()">Send</button>
-  </div>
+    <button type="submit">Send</button>
+    <button type="button" id="clearBtn" class="small">Clear</button>
+  </form>
 
   <script>
-    // 🔑 Replace this with your real OpenRouter API key
-    const API_KEY = "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;
-    const MODEL = "openai/gpt-4o"; // You can switch to another model (e.g., mistralai/mistral-7b-instruct)
+    // 🔑 Replace with your OpenRouter API key
+    const API_KEY = "sk-or-xxxxxxxxxxxxxxxxxxxxxxxx";
+    const MODEL = "openai/gpt-4o"; // You can change this
+    const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+    // Extra debug logging to help you verify what's happening
+    console.log("[Debug] Page URL:", window.location.href);
+    console.log("[Debug] Will POST to:", OPENROUTER_URL);
+
+    const form = document.getElementById("inputArea");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault(); // ✅ never let the form post to /api/ai
+      sendMessage();
+    });
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      document.getElementById("chatbox").innerHTML = "";
+      console.clear();
+      console.log("[Debug] Chat cleared.");
+    });
 
     async function sendMessage() {
       const input = document.getElementById("userInput");
@@ -83,7 +109,8 @@
       input.value = "";
 
       try {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        console.log("[Debug] Fetching:", OPENROUTER_URL);
+        const response = await fetch(OPENROUTER_URL, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${API_KEY}`,
@@ -95,11 +122,21 @@
           })
         });
 
-        const data = await response.json();
-        const reply = data.choices?.[0]?.message?.content || "⚠️ Error: No response";
+        // If server returns non-JSON (like an HTML error), this will throw.
+        let data;
+        const raw = await response.text();
+        try {
+          data = JSON.parse(raw);
+        } catch (parseErr) {
+          console.error("[Debug] Non-JSON response received:", raw);
+          throw new Error("Server did not return JSON. See console for raw response.");
+        }
+
+        const reply = data?.choices?.[0]?.message?.content || "⚠️ Error: No response";
         addMessage(reply, "bot");
       } catch (err) {
-        addMessage("⚠️ Network error: " + err.message, "bot");
+        addMessage("⚠️ Error: " + err.message, "bot");
+        console.error("[Debug] Error details:", err);
       }
     }
 
@@ -110,6 +147,30 @@
       msgDiv.innerText = text;
       chatbox.appendChild(msgDiv);
       chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+    // Safety check: warn if any script tries to call /api/ai (e.g., due to old code)
+    (function monkeyPatchFetch() {
+      const origFetch = window.fetch;
+      window.fetch = function(url, options) {
+        if (typeof url === "string" && url.includes("/api/ai")) {
+          console.warn("🚫 Blocked a call to /api/ai. Using OPENROUTER_URL instead.", url);
+          return origFetch(OPENROUTER_URL, options);
+        }
+        return origFetch(url, options);
+      };
+      console.log("[Debug] fetch() monkey-patched to prevent /api/ai calls.");
+    })();
+
+    // If you had a service worker caching an old build, this page won't register any.
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        if (regs.length) {
+          console.log("[Debug] Service workers found. Consider unregistering old ones in Application > Service Workers.");
+        } else {
+          console.log("[Debug] No service workers registered for this origin.");
+        }
+      });
     }
   </script>
 </body>
