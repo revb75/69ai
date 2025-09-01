@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PubNub Chat SDK Demo</title>
+  <title>PubNub Chat SDK Demo (Debug)</title>
   <style>
     body { margin:0; font-family:sans-serif; background:#0b0f14; color:#e6eef8; }
     .chat { display:flex; flex-direction:column; height:100vh; }
@@ -37,34 +37,55 @@
 <script>
 (async function(){
   const me = prompt("Enter your display name:", "guest-" + Math.floor(Math.random()*1000));
-
-  // ✅ Your PubNub subscribe key
-  const subscribeKey = "sub-c-f22ff86e-252f-4592-83ef-17f4d28d7ecc";
+  const subscribeKey = "sub-c-f22ff86e-252f-4592-83ef-17f4d28d7ecc"; // ✅ your key
   const channel = "room-1";
 
-  // Initialize PubNub Chat
-  const chat = await Chat.init({
-    subscribeKey,
-    userId: me
-  });
+  let chat, space;
 
-  // Join a space (channel)
-  const space = await chat.spaces.join(channel);
+  // Step 1: Init
+  try {
+    chat = await Chat.init({ subscribeKey, userId: me });
+    console.log("✅ Chat SDK initialized", chat);
+  } catch (err) {
+    console.error("❌ Failed to initialize PubNub Chat:", err);
+    alert("Could not start chat: " + err.message);
+    return;
+  }
 
-  // Load last 25 messages
-  const history = await space.getMessages({ count: 25 });
-  history.messages.forEach(msg => addMessage({author: msg.message.from, text: msg.message.text, mine: msg.message.from===me}));
+  // Step 2: Join space
+  try {
+    space = await chat.spaces.join(channel);
+    console.log("✅ Joined space:", channel, space);
+  } catch (err) {
+    console.error("❌ Failed to join space:", err);
+    alert("Join failed: " + err.message);
+    return;
+  }
 
-  // Listen for new messages
+  // Step 3: Load history
+  try {
+    const history = await space.getMessages({ count: 25 });
+    console.log("📜 Loaded history:", history);
+    history.messages.forEach(msg =>
+      addMessage({author: msg.message.from, text: msg.message.text, mine: msg.message.from===me})
+    );
+  } catch (err) {
+    console.warn("⚠️ History fetch failed:", err);
+  }
+
+  // Step 4: Listeners
   space.on("message", (msg) => {
+    console.log("📩 Message received:", msg);
     addMessage({author: msg.message.from, text: msg.message.text, mine: msg.message.from===me});
   });
 
-  // Presence events (join/leave)
-  space.on("membership", () => refreshOnline());
+  space.on("membership", (evt) => {
+    console.log("👥 Membership event:", evt);
+    refreshOnline();
+  });
 
-  // Typing signal
   space.on("signal", (sig) => {
+    console.log("✍️ Signal:", sig);
     if(sig.message?.type === "typing" && sig.publisher !== me){
       showTyping(`${sig.publisher} is typing...`);
       clearTimeout(window._typingTimer);
@@ -72,19 +93,27 @@
     }
   });
 
-  // Handle form submit
+  // Step 5: Send messages
   document.getElementById("composer").onsubmit = async (e) => {
     e.preventDefault();
     const input = document.getElementById("messageInput");
     const text = input.value.trim();
     if(!text) return;
     input.value = "";
-    await space.publish({ from: me, text });
+    try {
+      const result = await space.publish({ from: me, text });
+      console.log("📤 Published:", result);
+    } catch (err) {
+      console.error("❌ Publish failed:", err);
+      alert("Send failed: " + err.message);
+    }
   };
 
-  // Send typing indicator
+  // Step 6: Typing indicator
   document.getElementById("messageInput").addEventListener("input", ()=>{
-    space.signal({ type:"typing", user: me });
+    space.signal({ type:"typing", user: me }).catch(err=>{
+      console.warn("⚠️ Signal failed:", err);
+    });
   });
 
   // Helpers
@@ -97,8 +126,13 @@
   }
   function showTyping(t){ document.getElementById("typing").textContent = t; }
   async function refreshOnline(){
-    const here = await space.hereNow();
-    document.getElementById("presenceCount").textContent = `${here.totalOccupancy} online`;
+    try {
+      const here = await space.hereNow();
+      console.log("👥 HereNow:", here);
+      document.getElementById("presenceCount").textContent = `${here.totalOccupancy} online`;
+    } catch (e) {
+      console.warn("⚠️ Presence fetch failed:", e);
+    }
   }
   refreshOnline();
 })();
