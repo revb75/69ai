@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat Relay MVP</title>
+  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.0.min.js"></script>
+  <style>
+    body { margin:0; font-family:sans-serif; background:#0b0f14; color:#e6eef8; }
+    .screen { display:none; height:100vh; align-items:center; justify-content:center; }
+    .active { display:flex; }
+    .card { background:#111826; padding:24px; border-radius:12px; width:320px; }
+    input,button { width:100%; padding:10px; margin-top:8px; border-radius:8px; border:1px solid #333; }
+    button { background:#6ea8fe; color:#08121e; font-weight:700; cursor:pointer; }
+    .chat { display:flex; flex-direction:column; height:100vh; }
+    .topbar { padding:8px 16px; background:#111826; border-bottom:1px solid #222; display:flex; justify-content:space-between; }
+    .messages { flex:1; overflow-y:auto; padding:16px; }
+    .msg { margin-bottom:8px; }
+    .msg.me { text-align:right; }
+    .bubble { display:inline-block; padding:8px 12px; border-radius:12px; background:#1a2438; }
+    .msg.me .bubble { background:#10203a; }
+    .composer { display:flex; border-top:1px solid #222; }
+    .composer input { flex:1; border:none; padding:12px; border-radius:0; background:#0a121c; color:#fff; }
+    .composer button { border:none; padding:12px 16px; }
+  </style>
+</head>
+<body>
+<div id="gate" class="screen active">
+  <div class="card">
+    <h3>Enter to Chat</h3>
+    <input id="name" placeholder="Display name" />
+    <input id="dob" type="date" />
+    <button id="enterBtn">Enter</button>
+    <div id="gateMsg" style="color:#f88; margin-top:8px;"></div>
+  </div>
+</div>
+<div id="chatScreen" class="screen">
+  <div class="chat">
+    <div class="topbar">
+      <div>💬 Chat</div>
+      <div id="presenceCount">0 online</div>
+    </div>
+    <div id="messages" class="messages"></div>
+    <form id="composer" class="composer">
+      <input id="messageInput" placeholder="Type a message…" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</div>
+<script>
+let me=null, token=null, pubnub=null, currentChannel=null;
+const els={ gate:document.getElementById("gate"), chat:document.getElementById("chatScreen"),
+  enterBtn:document.getElementById("enterBtn"), name:document.getElementById("name"),
+  dob:document.getElementById("dob"), gateMsg:document.getElementById("gateMsg"),
+  messages:document.getElementById("messages"), composer:document.getElementById("composer"),
+  input:document.getElementById("messageInput"), presence:document.getElementById("presenceCount") };
+function addMessage({author,text,ts,mine}){ const d=document.createElement("div");
+  d.className="msg"+(mine?" me":""); d.innerHTML=`<div class="bubble"><b>${author}</b>: ${text}</div>`;
+  els.messages.appendChild(d); els.messages.scrollTop=els.messages.scrollHeight;}
+els.enterBtn.onclick=async()=>{ me=els.name.value.trim(); const dob=els.dob.value;
+  if(!me||!dob){ els.gateMsg.textContent="Enter name and DOB"; return;}
+  try{ const r=await fetch("/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({user:me,dob})}); const data=await r.json();
+    if(!r.ok){ els.gateMsg.textContent=data.error||"Auth failed"; return;}
+    token=data.token; setupChat(data.subscribeKey,data.defaultChannel);
+    els.gate.classList.remove("active"); els.chat.classList.add("active");}
+  catch{ els.gateMsg.textContent="Server not reachable"; }};
+function setupChat(subscribeKey,channel){ currentChannel=channel;
+  pubnub=new PubNub({subscribeKey,uuid:me}); pubnub.addListener({ message:evt=>{
+    const {from,text}=evt.message; addMessage({author:from,text,ts:evt.timetoken/10000,mine:from===me}); },
+    presence:()=>refreshHereNow()}); pubnub.subscribe({channels:[channel],withPresence:true});
+  refreshHereNow(); els.composer.onsubmit=async e=>{ e.preventDefault(); const text=els.input.value.trim();
+    if(!text) return; els.input.value=""; await fetch("/send",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({channel,from:me,text,token})}).catch(()=>addMessage({author:"System",text:"Failed to reach API",ts:Date.now(),mine:false}));};}
+async function refreshHereNow(){ if(!currentChannel) return; try{ const r=await pubnub.hereNow({channels:[currentChannel],includeUUIDs:true});
+  els.presence.textContent=`${r.totalOccupancy||0} online`; }catch{}}
+</script>
+</body>
+</html>
