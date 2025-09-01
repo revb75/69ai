@@ -1,109 +1,230 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Uncensored AI Chat</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Chat Console</title>
   <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --muted: #9ab;
+      --text: #e6edf3;
+      --accent: #70e1ff;
+      --accent-2: #a8ff78;
+      --danger: #ff6b6b;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
     body {
-      font-family: sans-serif;
-      background: #0b0f14;
-      color: #e6eef8;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
+      margin: 0; background: radial-gradient(1200px 800px at 10% -10%, #142032 0%, #0b0f14 60%), var(--bg);
+      color: var(--text); font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      min-height: 100vh; display: grid; place-items: stretch; }
+    .app { max-width: 980px; margin: 0 auto; display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; padding: 16px; gap: 12px; }
+    header {
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(8px);
+      border-radius: var(--radius); padding: 12px; display: grid; gap: 10px;
     }
+    header .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .title { font-weight: 700; letter-spacing: 0.2px; font-size: 18px; }
+    .pill { padding: 6px 10px; border-radius: 999px; background: #0f1520; border: 1px solid rgba(255,255,255,0.08); color: var(--muted); }
+    label { font-size: 12px; color: var(--muted); }
+    select,input[type="text"],input[type="password"],textarea {
+      background: #0f1520; color: var(--text); border: 1px solid rgba(255,255,255,0.1);
+      padding: 10px 12px; border-radius: 12px; outline: none; width: 100%;
+    }
+    input[type="checkbox"] { transform: translateY(1px); }
+    .grow { flex: 1 1 auto; min-width: 200px; }
+    .btn { cursor: pointer; border: none; font-weight: 600; letter-spacing: .2px; color: #0b0f14; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+    .btn.secondary { background: transparent; color: var(--text); border: 1px solid rgba(255,255,255,0.2); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+
     #chat {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1em;
+      background: #0d1320; border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius);
+      padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; min-height: 40vh;
     }
-    .msg {
-      margin: 0.5em 0;
-    }
-    .you {
-      color: #6ea8fe;
-    }
-    .ai {
-      color: #a6f5a6;
-    }
-    #composer {
-      display: flex;
-      border-top: 1px solid #333;
-    }
-    #msg {
-      flex: 1;
-      padding: 0.5em;
-      border: none;
-      font-size: 1em;
-    }
-    #send {
-      padding: 0.5em 1em;
-      background: #6ea8fe;
-      border: none;
-      font-weight: bold;
-      cursor: pointer;
-    }
+    .bubble { max-width: 85%; padding: 12px 14px; border-radius: 16px; white-space: pre-wrap; word-wrap: break-word; }
+    .me { align-self: flex-end; background: #21304a; border: 1px solid rgba(255,255,255,0.06); }
+    .bot { align-self: flex-start; background: #151c29; border: 1px solid rgba(255,255,255,0.06); }
+    .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    form#composer { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    #user { min-height: 68px; resize: vertical; }
+
+    .hint { font-size: 12px; color: var(--muted); }
+    .error { color: var(--danger); font-weight: 600; }
   </style>
 </head>
 <body>
-  <div id="chat"></div>
-  <form id="composer">
-    <input id="msg" placeholder="Type a message…" autocomplete="off"/>
-    <button id="send" type="submit">Send</button>
-  </form>
+  <div class="app">
+    <header>
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <div class="title">⚙️ AI Chat Console</div>
+        <div class="pill" id="status">idle</div>
+      </div>
+      <div class="row">
+        <label class="pill">Provider</label>
+        <label class="pill"><input type="radio" name="provider" value="openrouter" checked> OpenRouter</label>
+        <label class="pill"><input type="radio" name="provider" value="together"> Together</label>
+        <label class="pill"><input type="checkbox" id="useProxy"> Use /api/chat proxy</label>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <label>Model slug</label>
+          <input id="model" type="text" placeholder="e.g., meta-llama/llama-3.3-70b-instruct" />
+          <div class="hint">Use any valid model for your provider (check their model list). Defaults set on first run.</div>
+        </div>
+        <div class="grow">
+          <label>API key (stored locally)</label>
+          <div class="row" style="gap:8px;">
+            <input id="apiKey" type="password" class="grow" placeholder="Paste your API key" />
+            <button class="btn secondary" id="toggleKey" type="button">Show</button>
+            <button class="btn" id="save" type="button">Save</button>
+          </div>
+          <div class="hint">For quick local testing you may paste your key. For production, enable the proxy above and keep keys server‑side.</div>
+        </div>
+      </div>
+    </header>
+
+    <main id="chat" aria-live="polite" aria-busy="false"></main>
+
+    <form id="composer">
+      <textarea id="user" placeholder="Type a message and press Send…"></textarea>
+      <button id="send" class="btn" type="submit">Send ⮕</button>
+      <div class="hint">Shift+Enter for newline</div>
+    </form>
+  </div>
 
   <script>
-    const chat = document.getElementById("chat");
-    const input = document.getElementById("msg");
-    const form = document.getElementById("composer");
+    const $ = (s)=>document.querySelector(s);
+    const chat = $('#chat');
+    const statusPill = $('#status');
 
-    // Keeps full conversation
-    let history = [];
-
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const userText = input.value.trim();
-      if (!userText) return;
-      input.value = "";
-
-      // Show user message
-      append("You", userText, "you");
-      history.push({ role: "user", content: userText });
-
-      // Show placeholder for AI response
-      append("AI", "…thinking…", "ai", true);
-      const placeholder = chat.lastChild;
-
-      try {
-        // Call your Vercel API function
-        const resp = await fetch("/api/ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userMessage: userText, history })
-        });
-        const data = await resp.json();
-
-        // Replace placeholder with real AI reply
-        placeholder.textContent = "AI: " + data.reply;
-        placeholder.style.opacity = 1;
-
-        // Add reply to history for context
-        history.push({ role: "assistant", content: data.reply });
-      } catch (err) {
-        placeholder.textContent = "AI: [error]";
-        console.error("Request failed", err);
-      }
+    const state = {
+      provider: localStorage.getItem('ai_provider') || 'openrouter',
+      model: localStorage.getItem('ai_model') || 'meta-llama/llama-3.3-70b-instruct',
+      apiKey: localStorage.getItem('ai_key') || '',
+      useProxy: localStorage.getItem('ai_useProxy') === '1',
+      messages: JSON.parse(localStorage.getItem('ai_messages') || '[]'),
+      system: { role: 'system', content: 'You are a concise, helpful assistant.' }
     };
 
-    function append(who, text, cls, temp=false) {
-      const div = document.createElement("div");
-      div.className = "msg " + cls;
-      div.textContent = who + ": " + text;
-      if (temp) div.style.opacity = 0.6;
-      chat.appendChild(div);
+    // Initialize UI
+    document.querySelectorAll('input[name="provider"]').forEach(r=>{
+      r.checked = (r.value === state.provider);
+      r.addEventListener('change', ()=>{
+        state.provider = r.value; persist();
+        if(state.provider === 'together' && !$('#model').value) {
+          $('#model').value = 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo';
+        }
+      });
+    });
+    $('#model').value = state.model;
+    $('#apiKey').value = state.apiKey;
+    $('#useProxy').checked = state.useProxy;
+
+    $('#toggleKey').onclick = () => {
+      const i = $('#apiKey');
+      i.type = i.type === 'password' ? 'text' : 'password';
+      $('#toggleKey').textContent = i.type === 'password' ? 'Show' : 'Hide';
+    };
+
+    $('#save').onclick = () => {
+      state.model = $('#model').value.trim() || state.model;
+      state.apiKey = $('#apiKey').value.trim();
+      state.useProxy = $('#useProxy').checked;
+      persist();
+      toast('Saved settings');
+    };
+
+    $('#useProxy').onchange = () => { state.useProxy = $('#useProxy').checked; persist(); };
+
+    // Render existing messages
+    state.messages.forEach(m => renderBubble(m.role, m.content));
+
+    $('#composer').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const text = $('#user').value.trim();
+      if(!text) return;
+      $('#user').value = '';
+      addMessage({ role: 'user', content: text });
+      await respond();
+    });
+
+    $('#user').addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#send').click(); }
+    });
+
+    function persist() {
+      localStorage.setItem('ai_provider', state.provider);
+      localStorage.setItem('ai_model', $('#model').value.trim() || state.model);
+      localStorage.setItem('ai_key', state.apiKey);
+      localStorage.setItem('ai_useProxy', state.useProxy ? '1' : '0');
+      localStorage.setItem('ai_messages', JSON.stringify(state.messages));
+    }
+
+    function addMessage(msg) { state.messages.push(msg); renderBubble(msg.role, msg.content); persist(); }
+
+    function renderBubble(role, content) {
+      const wrap = document.createElement('div');
+      wrap.className = `bubble ${role === 'user' ? 'me' : 'bot'}`;
+      wrap.textContent = content;
+      chat.appendChild(wrap);
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = role === 'user' ? 'You' : 'Assistant';
+      chat.appendChild(meta);
       chat.scrollTop = chat.scrollHeight;
     }
+
+    async function respond() {
+      const thinking = { role: 'assistant', content: '…' };
+      renderBubble('assistant', 'Thinking…');
+      status('working');
+
+      try {
+        const payload = {
+          model: ($('#model').value.trim() || state.model),
+          messages: [state.system, ...state.messages],
+          temperature: 0.7
+        };
+
+        const viaProxy = state.useProxy;
+        const provider = state.provider;
+        const endpoint = viaProxy ? '/api/chat' : (provider === 'openrouter'
+          ? 'https://openrouter.ai/api/v1/chat/completions'
+          : 'https://api.together.xyz/v1/chat/completions');
+
+        const headers = viaProxy ? { 'Content-Type': 'application/json' } : (provider === 'openrouter' ? {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.apiKey}`,
+          'HTTP-Referer': location.origin,
+          'X-Title': 'AI Chat Console'
+        } : {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.apiKey}`
+        });
+
+        const body = viaProxy ? JSON.stringify({ provider, ...payload }) : JSON.stringify(payload);
+
+        const res = await fetch(endpoint, { method: 'POST', headers, body });
+        if(!res.ok) {
+          const t = await res.text();
+          throw new Error(`HTTP ${res.status}: ${t.substring(0, 200)}`);
+        }
+        const data = await res.json();
+        const content = (data.choices?.[0]?.message?.content) || (data.choices?.[0]?.text) || '[No content]';
+        addMessage({ role: 'assistant', content });
+      } catch (err) {
+        addMessage({ role: 'assistant', content: `Error: ${err.message}` });
+      } finally {
+        status('idle');
+      }
+    }
+
+    function status(s) { statusPill.textContent = s; chat.setAttribute('aria-busy', s !== 'idle'); }
+    function toast(t) { statusPill.textContent = t; setTimeout(()=>status('idle'), 1200); }
   </script>
 </body>
 </html>
