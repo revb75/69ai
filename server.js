@@ -9,9 +9,9 @@ import fs from "fs";
 dotenv.config();
 
 const {
-  pub-c-acd54e50-42a9-4ac5-bd2e-442ed8e5541f,
-  sub-c-f22ff86e-252f-4592-83ef-17f4d28d7ecc,
-  sec-c-NDA3MDE5MTgtM2M2OC00OGY0LTg3NDUtMDU4Y2NjZGU1ZmQ3,
+  PUBNUB_PUBLISH_KEY,
+  PUBNUB_SUBSCRIBE_KEY,
+  PUBNUB_SECRET_KEY,
   JWT_SECRET,
   DEFAULT_CHANNEL = "room-1",
   PORT = 5173,
@@ -20,7 +20,7 @@ const {
 const pubnub = new PubNub({
   publishKey: PUBNUB_PUBLISH_KEY,
   subscribeKey: PUBNUB_SUBSCRIBE_KEY,
-  secretKey: PUBNUB_SECRET_KEY,
+  secretKey: PUBNUB_SECRET_KEY, // keep secret key server-side only
   uuid: "server",
 });
 
@@ -33,10 +33,18 @@ app.use(express.json());
 app.post("/auth", (req, res) => {
   const { dob, user } = req.body;
   if (!dob || !user) return res.status(400).json({ error: "missing_fields" });
-  const age = Math.floor((Date.now() - new Date(dob).getTime()) / (365.25*24*60*60*1000));
+
+  const age = Math.floor(
+    (Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+  );
   if (age < 18) return res.status(403).json({ error: "age_restriction" });
+
   const token = jwt.sign({ user }, JWT_SECRET, { expiresIn: "1h" });
-  res.json({ token, subscribeKey: PUBNUB_SUBSCRIBE_KEY, defaultChannel: DEFAULT_CHANNEL });
+  res.json({
+    token,
+    subscribeKey: PUBNUB_SUBSCRIBE_KEY,
+    defaultChannel: DEFAULT_CHANNEL,
+  });
 });
 
 // Simple profanity filter
@@ -49,11 +57,21 @@ app.post("/send", (req, res) => {
   const { channel, from, text, token } = req.body;
   if (!channel || !from || !text || !token)
     return res.status(400).json({ error: "missing_fields" });
-  try { jwt.verify(token, JWT_SECRET); } catch { return res.status(403).json({ error: "invalid_token" }); }
+
+  try {
+    jwt.verify(token, JWT_SECRET);
+  } catch {
+    return res.status(403).json({ error: "invalid_token" });
+  }
+
   const clean = sanitize(text);
-  pubnub.publish({ channel, message: { from, text: clean } })
-    .then(r => {
-      fs.appendFileSync("messages.log", JSON.stringify({ channel, from, text: clean, ts: Date.now() })+"\n");
+  pubnub
+    .publish({ channel, message: { from, text: clean } })
+    .then((r) => {
+      fs.appendFileSync(
+        "messages.log",
+        JSON.stringify({ channel, from, text: clean, ts: Date.now() }) + "\n"
+      );
       res.json({ ok: true, timetoken: r.timetoken });
     })
     .catch(() => res.status(500).json({ error: "publish_failed" }));
@@ -62,4 +80,6 @@ app.post("/send", (req, res) => {
 // Serve index.html
 app.use("/", express.static("./"));
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Server running on http://localhost:${PORT}`)
+);
