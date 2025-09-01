@@ -9,9 +9,9 @@ import fs from "fs";
 dotenv.config();
 
 const {
-  PUBNUB_PUBLISH_KEY,
-  PUBNUB_SUBSCRIBE_KEY,
-  PUBNUB_SECRET_KEY,
+  pub-c-acd54e50-42a9-4ac5-bd2e-442ed8e5541f,
+  sub-c-f22ff86e-252f-4592-83ef-17f4d28d7ecc,
+  sec-c-NDA3MDE5MTgtM2M2OC00OGY0LTg3NDUtMDU4Y2NjZGU1ZmQ3,
   JWT_SECRET,
   DEFAULT_CHANNEL = "room-1",
   PORT = 5173,
