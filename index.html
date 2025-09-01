@@ -1,163 +1,114 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OpenRouter Inline Chat (Proxy Mode)</title>
+  <meta charset="UTF-8">
+  <title>Uncensored Chatbot</title>
   <style>
-    :root { --bg:#070b12; --panel:#0f1624; --edge:rgba(255,255,255,.08); --text:#e6edf3; --muted:#99a6b5; --accent:#7ee8fa; --accent2:#eec0c6; --radius:16px; }
-    *{box-sizing:border-box}
-    body{margin:0;background:radial-gradient(80% 60% at 10% 0%,#17233b 0%,#0b101a 50%),var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .app{max-width:980px;margin:0 auto;min-height:100vh;display:grid;grid-template-rows:auto 1fr auto;gap:12px;padding:16px}
-    header{border:1px solid var(--edge);border-radius:var(--radius);padding:12px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));backdrop-filter:blur(8px);display:grid;gap:10px}
-    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .title{font-weight:700;letter-spacing:.2px}
-    .pill{padding:6px 10px;border-radius:999px;background:#0c1423;border:1px solid var(--edge);color:var(--muted)}
-    label{font-size:12px;color:var(--muted)}
-    input[type=text],textarea,select{width:100%;background:#0c1423;color:var(--text);border:1px solid var(--edge);border-radius:12px;padding:10px 12px;outline:none}
-    .btn{cursor:pointer;border:none;border-radius:12px;padding:10px 14px;font-weight:600;letter-spacing:.2px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0f16}
-    .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--edge)}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    #chat{background:#0c1220;border:1px solid var(--edge);border-radius:var(--radius);padding:14px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:50vh}
-    .bubble{max-width:85%;padding:12px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
-    .me{align-self:flex-end;background:#1b2942;border:1px solid var(--edge)}
-    .bot{align-self:flex-start;background:#121a2b;border:1px solid var(--edge)}
-    .meta{font-size:11px;color:var(--muted);margin-top:-6px}
-    form#composer{display:grid;grid-template-columns:1fr auto;gap:10px}
-    #user{min-height:72px;resize:vertical}
-    .hint{font-size:12px;color:var(--muted)}
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #chatbox {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      border-bottom: 1px solid #333;
+    }
+    .message {
+      margin: 5px 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      max-width: 75%;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    .user {
+      background: #007bff;
+      color: white;
+      margin-left: auto;
+    }
+    .bot {
+      background: #333;
+      color: #f0f0f0;
+      margin-right: auto;
+    }
+    #inputArea {
+      display: flex;
+      padding: 10px;
+      background: #1e1e1e;
+    }
+    #inputArea input {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+      background: #2a2a2a;
+      color: #fff;
+    }
+    #inputArea button {
+      margin-left: 10px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <div class="row" style="justify-content:space-between">
-        <div class="title">🛡️ OpenRouter Inline Chat — Proxy Mode (using chatbotkey)</div>
-        <div id="status" class="pill">idle</div>
-      </div>
-      <div class="row">
-        <div class="pill">Provider: <strong style="margin-left:6px">OpenRouter via /api/chat</strong></div>
-        <label class="pill">Streaming <input id="stream" type="checkbox" style="margin-left:6px" checked></label>
-      </div>
-      <div class="row">
-        <div style="flex:1 1 300px">
-          <label>Model slug</label>
-          <input id="model" type="text" placeholder="e.g., meta-llama/llama-3.3-70b-instruct" />
-          <div class="hint">Uses your serverless proxy. Set env var <code>chatbotkey</code> on the server.</div>
-        </div>
-      </div>
-      <div class="hint">Note: No provider is truly “uncensored.” OpenRouter routes to hosts with their own AUPs. Illegal/harmful content is blocked.</div>
-    </header>
-
-    <main id="chat" aria-live="polite" aria-busy="false"></main>
-
-    <form id="composer">
-      <textarea id="user" placeholder="Type a message and press Send…"></textarea>
-      <button id="send" class="btn" type="submit">Send ⮕</button>
-    </form>
+  <div id="chatbox"></div>
+  <div id="inputArea">
+    <input type="text" id="userInput" placeholder="Type your message...">
+    <button onclick="sendMessage()">Send</button>
   </div>
 
   <script>
-    const $ = sel=>document.querySelector(sel);
-    const chat = $('#chat');
-    const statusPill = $('#status');
+    const API_KEY = "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"; // 🔑 Replace with your OpenRouter API key
+    const MODEL = "openai/gpt-4o"; // Change model if you want (e.g., mistral, llama, etc.)
 
-    const state = {
-      model: localStorage.getItem('or_model') || 'meta-llama/llama-3.1-70b-instruct',
-      stream: (localStorage.getItem('or_stream') ?? '1') === '1',
-      system: { role:'system', content:'You are a concise, helpful assistant.' },
-      messages: JSON.parse(localStorage.getItem('or_messages')||'[]')
-    };
+    async function sendMessage() {
+      const input = document.getElementById("userInput");
+      const message = input.value.trim();
+      if (!message) return;
 
-    $('#model').value = state.model;
-    $('#stream').checked = state.stream;
-    state.messages.forEach(m=>renderBubble(m.role,m.content));
+      addMessage(message, "user");
+      input.value = "";
 
-    document.querySelector('#composer').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const text = $('#user').value.trim();
-      if(!text) return;
-      $('#user').value = '';
-      addMessage({ role:'user', content:text });
-      if(state.stream) await respondStream(); else await respondOnce();
-    });
-
-    function persist(){
-      localStorage.setItem('or_model', state.model);
-      localStorage.setItem('or_stream', state.stream ? '1':'0');
-      localStorage.setItem('or_messages', JSON.stringify(state.messages));
-    }
-
-    function addMessage(msg){ state.messages.push(msg); renderBubble(msg.role,msg.content); persist(); }
-
-    function renderBubble(role,content){
-      const wrap = document.createElement('div');
-      wrap.className = `bubble ${role==='user'?'me':'bot'}`;
-      wrap.textContent = content;
-      chat.appendChild(wrap);
-      const meta = document.createElement('div'); meta.className='meta'; meta.textContent = role==='user'?'You':'Assistant'; chat.appendChild(meta);
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    function status(s){ statusPill.textContent=s; chat.setAttribute('aria-busy', s!=='idle'); }
-    function toast(t){ statusPill.textContent=t; setTimeout(()=>status('idle'), 1200); }
-
-    $('#model').addEventListener('change', ()=>{ state.model = $('#model').value.trim() || state.model; persist(); });
-    $('#stream').addEventListener('change', ()=>{ state.stream = $('#stream').checked; persist(); });
-
-    async function respondOnce(){
-      status('working');
-      try{
-        const res = await fetch('/api/chat',{
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify({ model: $('#model').value.trim()||state.model, messages:[state.system, ...state.messages], stream:false })
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: message }]
+          })
         });
-        const text = await res.text();
-        if(!res.ok){ throw new Error(`HTTP ${res.status}: ${text.substring(0,200)}`); }
-        const data = JSON.parse(text);
-        const content = data.choices?.[0]?.message?.content || '[No content]';
-        addMessage({ role:'assistant', content });
-      }catch(err){ addMessage({ role:'assistant', content:`Error: ${err.message}`}); }
-      finally{ status('idle'); }
+
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content || "⚠️ Error: No response";
+        addMessage(reply, "bot");
+      } catch (err) {
+        addMessage("⚠️ Network error: " + err.message, "bot");
+      }
     }
 
-    async function respondStream(){
-      status('streaming');
-      const model = $('#model').value.trim()||state.model;
-      const payload = { model, stream:true, messages:[state.system, ...state.messages] };
-      let buf = '';
-      const bubble = document.createElement('div'); bubble.className='bubble bot'; bubble.textContent=''; chat.appendChild(bubble);
-      const meta = document.createElement('div'); meta.className='meta'; meta.textContent='Assistant'; chat.appendChild(meta);
-      chat.scrollTop = chat.scrollHeight;
-      try{
-        const res = await fetch('/api/chat',{
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if(!res.ok){ const t=await res.text(); throw new Error(`HTTP ${res.status}: ${t.substring(0,200)}`); }
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        while(true){
-          const {value,done} = await reader.read();
-          if(done) break;
-          const chunk = decoder.decode(value, {stream:true});
-          for(const line of chunk.split('\n')){
-            if(!line.startsWith('data:')) continue;
-            const data = line.slice(5).trim();
-            if(data === '[DONE]') break;
-            try{
-              const json = JSON.parse(data);
-              const delta = json.choices?.[0]?.delta?.content ?? '';
-              if(delta){ buf += delta; bubble.textContent = buf; chat.scrollTop = chat.scrollHeight; }
-            }catch{}
-          }
-        }
-        state.messages.push({ role:'assistant', content: buf || '[No content]' });
-        persist();
-      }catch(err){ bubble.textContent = `Error: ${err.message}`; }
-      finally{ status('idle'); }
+    function addMessage(text, sender) {
+      const chatbox = document.getElementById("chatbox");
+      const msgDiv = document.createElement("div");
+      msgDiv.className = `message ${sender}`;
+      msgDiv.innerText = text;
+      chatbox.appendChild(msgDiv);
+      chatbox.scrollTop = chatbox.scrollHeight;
     }
   </script>
 </body>
